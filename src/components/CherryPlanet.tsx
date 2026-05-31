@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { SAFE_LOW, SAFE_HIGH } from "@/hooks/use-planet-store";
 
 interface Props {
@@ -6,6 +7,10 @@ interface Props {
 }
 
 export function CherryPlanet({ size = 420, pressure = 500 }: Props) {
+  const uid = useId().replace(/:/g, "");
+  const craterId = `crater-${uid}`;
+  const crackGlowId = `crackGlow-${uid}`;
+
   const intensity = Math.max(0, Math.min(1, pressure / 1000));
   const inSafe = pressure >= SAFE_LOW && pressure <= SAFE_HIGH;
   const isCritical = pressure > SAFE_HIGH;
@@ -53,17 +58,17 @@ export function CherryPlanet({ size = 420, pressure = 500 }: Props) {
         {/* pitted craters */}
         <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full opacity-60">
           <defs>
-            <radialGradient id="crater" cx="40%" cy="35%">
+            <radialGradient id={craterId} cx="40%" cy="35%">
               <stop offset="0%" stopColor="oklch(10% 0.04 20)" />
               <stop offset="60%" stopColor="oklch(20% 0.08 20 / 0.7)" />
               <stop offset="100%" stopColor="transparent" />
             </radialGradient>
           </defs>
-          <circle cx="65" cy="35" r="8" fill="url(#crater)" />
-          <circle cx="30" cy="55" r="12" fill="url(#crater)" />
-          <circle cx="75" cy="70" r="6" fill="url(#crater)" />
-          <circle cx="50" cy="80" r="5" fill="url(#crater)" />
-          <circle cx="20" cy="25" r="4" fill="url(#crater)" />
+          <circle cx="65" cy="35" r="8" fill={`url(#${craterId})`} />
+          <circle cx="30" cy="55" r="12" fill={`url(#${craterId})`} />
+          <circle cx="75" cy="70" r="6" fill={`url(#${craterId})`} />
+          <circle cx="50" cy="80" r="5" fill={`url(#${craterId})`} />
+          <circle cx="20" cy="25" r="4" fill={`url(#${craterId})`} />
         </svg>
 
         {/* crack overlay — fades in above 650 PSI */}
@@ -74,12 +79,12 @@ export function CherryPlanet({ size = 420, pressure = 500 }: Props) {
             style={{ opacity: crackOpacity, transition: "opacity 1s var(--ease-viscous)" }}
           >
             <defs>
-              <filter id="crackGlow">
+              <filter id={crackGlowId}>
                 <feGaussianBlur stdDeviation="0.6" result="blur" />
                 <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
               </filter>
             </defs>
-            <g filter="url(#crackGlow)" stroke="oklch(65% 0.28 18)" strokeWidth="0.7" fill="none" strokeLinecap="round">
+            <g filter={`url(#${crackGlowId})`} stroke="oklch(65% 0.28 18)" strokeWidth="0.7" fill="none" strokeLinecap="round">
               <path d="M 55 10 L 62 28 L 58 35 L 70 55" />
               <path d="M 62 28 L 75 32" />
               <path d="M 20 40 L 32 52 L 28 65 L 40 80" />
