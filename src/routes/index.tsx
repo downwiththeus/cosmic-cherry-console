@@ -6,8 +6,7 @@ import { HarvestPanel } from "@/components/HarvestPanel";
 import { PressureSparkline } from "@/components/PressureSparkline";
 import { Tutorial, TutorialTrigger } from "@/components/Tutorial";
 import { GameOverlay } from "@/components/GameOverlay";
-import { usePlanetState } from "@/hooks/use-planet-state";
-import { WIN_TARGET, streakMultiplier } from "@/hooks/use-planet-store";
+import { usePlanetStore, WIN_TARGET, streakMultiplier } from "@/hooks/use-planet-store";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -20,12 +19,12 @@ export const Route = createFileRoute("/")({
 });
 
 function CrustView() {
-  const { data } = usePlanetState();
-  const p = data?.syrup_pressure ?? 0;
-  const refined = data?.refined ?? 0;
-  const streak = data?.streak ?? 0;
-  const bestRefined = data?.best_refined ?? 0;
-  const psiHistory = data?.psi_history ?? [];
+  const data = usePlanetStore();
+  const p = data.syrup_pressure;
+  const refined = data.refined;
+  const streak = data.streak;
+  const bestRefined = data.best_refined;
+  const psiHistory = data.psi_history;
   const pct = Math.min(100, (refined / WIN_TARGET) * 100);
   const mult = streakMultiplier(streak);
 
@@ -65,8 +64,8 @@ function CrustView() {
         </p>
       </div>
 
-      {/* Streak indicator */}
-      {streak > 1 && (
+      {/* Streak indicator — visible from first hit (streak ≥ 1) */}
+      {streak >= 1 && (
         <div
           className="absolute top-1/2 right-8 z-10 -translate-y-1/2 flex flex-col items-end gap-1"
           style={{ animation: "streak-pulse 1.4s ease-in-out infinite" }}
@@ -93,9 +92,9 @@ function CrustView() {
         </div>
         <HarvestPanel />
         <div className="flex flex-col gap-2 font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-          <Stat label="Juice" value={data?.total_juice ?? 0} />
-          <Stat label="Crust" value={data?.total_crust ?? 0} />
-          <Stat label="Pit" value={data?.total_pit ?? 0} />
+          <Stat label="Juice" value={data.total_juice} />
+          <Stat label="Crust" value={data.total_crust} />
+          <Stat label="Pit" value={data.total_pit} />
         </div>
       </section>
     </main>
@@ -107,7 +106,7 @@ function Stat({ label, value }: { label: string; value: number }) {
     <div className="flex items-center gap-3">
       <span className="w-12">{label}</span>
       <span className="font-display text-base" style={{ color: "var(--crust)" }}>
-        {Number(value).toFixed(1)}
+        {value.toFixed(1)}
       </span>
     </div>
   );

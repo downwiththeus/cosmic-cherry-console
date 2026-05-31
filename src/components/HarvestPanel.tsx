@@ -1,5 +1,8 @@
-import { useEffect, useState } from "react";
-import { planetStore, usePlanetStore, type ResourceType, DELTA, streakMultiplier } from "@/hooks/use-planet-store";
+import { useCallback, useEffect, useState } from "react";
+import {
+  planetStore, usePlanetStore, type ResourceType,
+  DELTA, streakMultiplier, MAX_PSI, SAFE_LOW, SAFE_HIGH,
+} from "@/hooks/use-planet-store";
 import { toast } from "sonner";
 
 const RESOURCES: { type: ResourceType; label: string; hint: string; key: string }[] = [
@@ -14,19 +17,24 @@ const PRESETS = [10, 25, 50, 100];
 
 export function HarvestPanel() {
   const [amount, setAmount] = useState(12);
-  const { streak, status } = usePlanetStore();
+  const [hoveredType, setHoveredType] = useState<ResourceType | null>(null);
+  const { streak, status, syrup_pressure } = usePlanetStore();
 
-  const extract = (type: ResourceType) => {
+  const extract = useCallback((type: ResourceType) => {
     if (status !== "playing") return;
     const delta = DELTA[type] * amount;
     const sign = delta >= 0 ? "+" : "";
-    const mult = type === "juice" && streak > 0 ? streakMultiplier(streak + 1) : 1;
-    const bonusNote = type === "juice" && streak > 0
+    const nextPsi = syrup_pressure + delta;
+    const clamped = Math.max(0, Math.min(MAX_PSI, nextPsi));
+    const willBeInSafe = clamped >= SAFE_LOW && clamped <= SAFE_HIGH;
+    const nextStreak = type === "juice" && willBeInSafe ? streak + 1 : 0;
+    const mult = streakMultiplier(nextStreak);
+    const bonusNote = type === "juice" && willBeInSafe
       ? ` · ${((mult - 1) * 100).toFixed(0)}% streak bonus`
       : "";
     planetStore.extract(type, amount);
     toast.success(`${sign}${delta.toFixed(1)} PSI · ${amount} ${type}${bonusNote}`);
-  };
+  }, [amount, streak, status, syrup_pressure]);
 
   // keyboard shortcuts
   useEffect(() => {
@@ -43,8 +51,7 @@ export function HarvestPanel() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [amount, streak, status]);
+  }, [extract]);
 
   return (
     <div className="flex flex-col items-center gap-5">
@@ -82,40 +89,59 @@ export function HarvestPanel() {
 
       {/* Extraction buttons */}
       <div className="flex gap-4">
-        {RESOURCES.map((r, idx) => (
-          <button
-            key={r.type}
-            onClick={() => extract(r.type)}
-            className={`${SHAPES[idx]} harvest-btn ease-viscous flex flex-col items-center justify-center gap-1 relative`}
-            style={{
-              width: 130, height: 130,
-              background: "oklch(22% 0.08 20)",
-              color: "var(--crust)",
-              transition: "all 700ms var(--ease-viscous)",
-              boxShadow: "inset 0 0 0 1px oklch(40% 0.1 20 / 0.5)",
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLElement).style.background = "var(--grad-syrup)";
-              (e.currentTarget as HTMLElement).style.color = "var(--pitted)";
-              (e.currentTarget as HTMLElement).style.boxShadow = "0 0 30px oklch(70% 0.25 25 / 0.5)";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.background = "oklch(22% 0.08 20)";
-              (e.currentTarget as HTMLElement).style.color = "var(--crust)";
-              (e.currentTarget as HTMLElement).style.boxShadow = "inset 0 0 0 1px oklch(40% 0.1 20 / 0.5)";
-            }}
-          >
-            {/* keyboard hint badge */}
-            <span
-              className="absolute font-mono text-[8px] tracking-[0.1em]"
-              style={{ top: "22%", opacity: 0.55, color: "inherit" }}
+        {RESOURCES.map((r, idx) => {
+          const isHovered = hoveredType === r.type;
+          return (
+            <button
+              key={r.type}
+              onClick={() => extract(r.type)}
+              onMouseEnter={() => setHoveredType(r.type)}
+              onMouseLeave={() => setHoveredType(null)}
+              className={`${SHAPES[idx]} harvest-btn ease-viscous flex flex-col items-center justify-center gap-1 relative`}
+              style={{
+                width: 130, height: 130,
+                background: isHovered ? "var(--grad-syrup)" : "oklch(22% 0.08 20)",
+                color: isHovered ? "var(--pitted)" : "var(--crust)",
+                transition: "all 700ms var(--ease-viscous)",
+                boxShadow: isHovered
+                  ? "0 0 30px oklch(70% 0.25 25 / 0.5)"
+                  : "inset 0 0 0 1px oklch(40% 0.1 20 / 0.5)",
+              }}
             >
-              [{r.key}]
-            </span>
-            <span className="font-display text-sm uppercase tracking-[0.15em]">{r.label}</span>
-            <span className="font-mono text-[9px] uppercase tracking-[0.3em] opacity-70">{r.hint}</span>
-          </button>
-        ))}
+              {/* keyboard hint badge */}
+              <span
+                className="absolute font-mono text-[8px] tracking-[0.1em]"
+                style={{ top: "22%", opacity: 0.55, color: "inherit" }}
+              >
+                [{r.key}]
+              </span>
+              <span className="font-display text-sm uppercase tracking-[0.15em]">{r.label}</span>
+              <span className="font-mono text-[9px] uppercase tracking-[0.3em] opacity-70">{r.hint}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* PSI outcome preview — warns when lethal or out-of-band */}
+      <div className="flex gap-4">
+        {RESOURCES.map((r) => {
+          const nextPsi = syrup_pressure + DELTA[r.type] * amount;
+          const clamped = Math.max(0, Math.min(MAX_PSI, nextPsi));
+          const lethal = nextPsi >= MAX_PSI || nextPsi <= 0;
+          const outOfBand = !lethal && (clamped > SAFE_HIGH || clamped < SAFE_LOW);
+          const color = lethal
+            ? "var(--destructive)"
+            : outOfBand
+            ? "oklch(75% 0.25 55)"
+            : "oklch(50% 0.1 150)";
+          return (
+            <div key={r.type} className="w-[130px] text-center">
+              <span className="font-mono text-[8px] uppercase tracking-[0.2em]" style={{ color }}>
+                {lethal ? "⚠ lethal" : `→ ${clamped.toFixed(0)} psi`}
+              </span>
+            </div>
+          );
+        })}
       </div>
 
       {/* Keyboard hint */}

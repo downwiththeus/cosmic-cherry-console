@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { usePlanetState } from "@/hooks/use-planet-state";
+import { usePlanetStore } from "@/hooks/use-planet-store";
 import { GameOverlay } from "@/components/GameOverlay";
 
 export const Route = createFileRoute("/core")({
@@ -32,14 +32,45 @@ const EVENTS = [
   { t: "−22:09", msg: "Syrup vein rerouted, sector 4", level: "ok" as const },
 ];
 
+// Seismograph isolated so its 80ms interval doesn't re-render PitView.
+function Seismograph({ pressure }: { pressure: number }) {
+  const [phase, setPhase] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setPhase((p) => p + 0.12), 80);
+    return () => clearInterval(t);
+  }, []);
+  const amp = 10 + (pressure / 1000) * 22;
+  const W = 320, H = 60;
+  const pts = Array.from({ length: 64 }, (_, i) => {
+    const x = (i / 63) * W;
+    const y = H / 2 + Math.sin(i * 0.45 + phase) * amp * 0.6 + Math.sin(i * 0.18 + phase * 0.7) * amp * 0.4;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  return (
+    <div className="clip-hex px-4 py-3" style={{ background: "oklch(18% 0.06 18)" }}>
+      <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+        <line x1="0" y1={H / 2} x2={W} y2={H / 2} stroke="oklch(30% 0.08 18 / 0.5)" strokeDasharray="2 4" />
+        <polyline
+          fill="none"
+          stroke={pressure > 800 ? "var(--destructive)" : "var(--syrup)"}
+          strokeWidth="1.5"
+          points={pts}
+          style={{ filter: "drop-shadow(0 0 4px currentColor)" }}
+        />
+      </svg>
+    </div>
+  );
+}
+
 function PitView() {
-  const { data } = usePlanetState();
-  const p = data?.syrup_pressure ?? 0;
-  const integrity = Math.max(0, (1 - p / 1000) * 100);
-  const totalPit = Number(data?.total_pit ?? 0);
-  const totalJuice = Number(data?.total_juice ?? 0);
-  const totalCrust = Number(data?.total_crust ?? 0);
-  const fissure = Math.min(99, p / 12);
+  const data = usePlanetStore();
+  const p = data.syrup_pressure;
+  // Integrity peaks at the pressure midpoint (500 psi) and drops to 0% at both extremes.
+  const integrity = Math.max(0, 100 - Math.abs(p - 500) / 5);
+  const totalPit = data.total_pit;
+  const totalJuice = data.total_juice;
+  const totalCrust = data.total_crust;
+  const fissure = Math.min(99, Math.abs(p - 500) / 5);
   const resonance = 38 + (p / 1000) * 18;
 
   // Rotating doctrine
@@ -48,20 +79,6 @@ function PitView() {
     const t = setInterval(() => setDIdx((d) => (d + 1) % DOCTRINE.length), 6000);
     return () => clearInterval(t);
   }, []);
-
-  // Seismograph: 64 points, animated phase
-  const [phase, setPhase] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => setPhase((p) => p + 0.12), 80);
-    return () => clearInterval(t);
-  }, []);
-  const amp = 10 + (p / 1000) * 22;
-  const W = 320, H = 60;
-  const pts = Array.from({ length: 64 }, (_, i) => {
-    const x = (i / 63) * W;
-    const y = H / 2 + Math.sin(i * 0.45 + phase) * amp * 0.6 + Math.sin(i * 0.18 + phase * 0.7) * amp * 0.4;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(" ");
 
   return (
     <main className="relative w-screen h-screen overflow-hidden">
@@ -92,18 +109,7 @@ function PitView() {
         <Readout label="Resonance" value={`${resonance.toFixed(1)} Hz`} />
 
         <PanelLabel className="mt-4">Seismograph</PanelLabel>
-        <div className="clip-hex px-4 py-3" style={{ background: "oklch(18% 0.06 18)" }}>
-          <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-            <line x1="0" y1={H / 2} x2={W} y2={H / 2} stroke="oklch(30% 0.08 18 / 0.5)" strokeDasharray="2 4" />
-            <polyline
-              fill="none"
-              stroke={p > 800 ? "var(--destructive)" : "var(--syrup)"}
-              strokeWidth="1.5"
-              points={pts}
-              style={{ filter: "drop-shadow(0 0 4px currentColor)" }}
-            />
-          </svg>
-        </div>
+        <Seismograph pressure={p} />
       </aside>
 
       {/* RIGHT lore + tallies */}
@@ -123,9 +129,9 @@ function PitView() {
             className="font-mono text-[11px] leading-relaxed animate-fade-in"
             style={{ color: "var(--crust)" }}
           >
-            <span style={{ color: "var(--syrup)" }}>“</span>
+            <span style={{ color: "var(--syrup)" }}>"</span>
             {DOCTRINE[dIdx]}
-            <span style={{ color: "var(--syrup)" }}>”</span>
+            <span style={{ color: "var(--syrup)" }}>"</span>
           </p>
         </div>
 

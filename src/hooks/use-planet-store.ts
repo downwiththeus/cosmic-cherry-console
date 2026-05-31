@@ -86,7 +86,7 @@ export const planetStore = {
 
     const inSafe = clamped >= SAFE_LOW && clamped <= SAFE_HIGH;
     const isStreakHit = resource_type === "juice" && inSafe;
-    const nextStreak = isStreakHit ? state.streak + 1 : 0;
+    const nextStreak = isStreakHit ? Math.min(state.streak + 1, STREAK_MAX) : 0;
     const mult = isStreakHit ? streakMultiplier(nextStreak) : 1;
     const refinedGain = resource_type === "juice" && inSafe ? amount * mult : 0;
     const nextRefined = state.refined + refinedGain;
