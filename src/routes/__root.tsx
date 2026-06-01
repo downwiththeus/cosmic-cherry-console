@@ -4,6 +4,7 @@ import {
 } from "@tanstack/react-router";
 import { Toaster } from "sonner";
 import appCss from "../styles.css?url";
+import { StarField } from "@/components/StarField";
 
 function NotFoundComponent() {
   return (
@@ -63,6 +64,7 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   return (
     <QueryClientProvider client={queryClient}>
+      <StarField />
       <Outlet />
       <Toaster
         theme="dark"

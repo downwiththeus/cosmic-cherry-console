@@ -26,6 +26,8 @@ export function GameOverlay() {
   } as const;
   const m = map[s.status as keyof typeof map];
 
+  const streakNote = s.streak > 0 ? ` · Peak streak ${s.streak}×` : "";
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-md"
       style={{ background: "oklch(8% 0.03 18 / 0.85)" }}>
@@ -38,12 +40,23 @@ export function GameOverlay() {
         <p className="font-mono text-xs mt-4 leading-relaxed" style={{ color: "var(--crust)" }}>
           {m.sub}
         </p>
-        <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground mt-6">
-          Refined: {s.refined.toFixed(0)} / {WIN_TARGET} · Safe band {SAFE_LOW}–{SAFE_HIGH} psi
+        <p className="font-mono text-[10px] italic tracking-[0.15em] mt-3" style={{ color: m.tone }}>
+          {m.flavor}
         </p>
+        <div className="mt-5 pt-5 border-t" style={{ borderColor: "oklch(30% 0.08 18 / 0.4)" }}>
+          <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+            Refined: <span style={{ color: "var(--syrup)" }}>{s.refined.toFixed(0)}</span>
+            {streakNote} · Safe band {SAFE_LOW}–{SAFE_HIGH} psi
+          </p>
+          {s.best_refined > 0 && (
+            <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground mt-1">
+              Session best: <span style={{ color: "var(--syrup)" }}>{s.best_refined.toFixed(0)}</span> units
+            </p>
+          )}
+        </div>
         <button
           onClick={() => planetStore.reset()}
-          className="mt-8 px-8 py-3 font-mono text-[11px] uppercase tracking-[0.4em] clip-hex"
+          className="mt-6 px-8 py-3 font-mono text-[11px] uppercase tracking-[0.4em] clip-hex"
           style={{ background: "var(--grad-syrup)", color: "var(--pitted)" }}
         >
           Reseed Planet
