@@ -9,10 +9,16 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SurfaceRouteImport } from './routes/surface'
 import { Route as RefineryRouteImport } from './routes/refinery'
 import { Route as CoreRouteImport } from './routes/core'
 import { Route as IndexRouteImport } from './routes/index'
 
+const SurfaceRoute = SurfaceRouteImport.update({
+  id: '/surface',
+  path: '/surface',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RefineryRoute = RefineryRouteImport.update({
   id: '/refinery',
   path: '/refinery',
@@ -33,34 +39,45 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/core': typeof CoreRoute
   '/refinery': typeof RefineryRoute
+  '/surface': typeof SurfaceRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/core': typeof CoreRoute
   '/refinery': typeof RefineryRoute
+  '/surface': typeof SurfaceRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/core': typeof CoreRoute
   '/refinery': typeof RefineryRoute
+  '/surface': typeof SurfaceRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/core' | '/refinery'
+  fullPaths: '/' | '/core' | '/refinery' | '/surface'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/core' | '/refinery'
-  id: '__root__' | '/' | '/core' | '/refinery'
+  to: '/' | '/core' | '/refinery' | '/surface'
+  id: '__root__' | '/' | '/core' | '/refinery' | '/surface'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CoreRoute: typeof CoreRoute
   RefineryRoute: typeof RefineryRoute
+  SurfaceRoute: typeof SurfaceRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/surface': {
+      id: '/surface'
+      path: '/surface'
+      fullPath: '/surface'
+      preLoaderRoute: typeof SurfaceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/refinery': {
       id: '/refinery'
       path: '/refinery'
@@ -89,7 +106,18 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CoreRoute: CoreRoute,
   RefineryRoute: RefineryRoute,
+  SurfaceRoute: SurfaceRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
