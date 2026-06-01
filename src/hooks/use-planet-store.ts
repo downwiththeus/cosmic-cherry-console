@@ -65,32 +65,59 @@ function getServerSnapshot() { return initial(); }
 // pit prying drops pressure hard (relief valve) but is risky to overuse.
 const DELTA = { juice: 2.2, crust: -1.4, pit: -3.2 } as const;
 
+function applyPressure(psiDelta: number, refinedDelta: number, harvest?: Harvest, tally?: Partial<Pick<PlanetState, "total_juice" | "total_crust" | "total_pit">>) {
+  if (state.status !== "playing") return;
+  const nextPsi = state.syrup_pressure + psiDelta;
+  const clamped = Math.max(0, Math.min(MAX_PSI, nextPsi));
+  const nextRefined = state.refined + refinedDelta;
+  let status: GameStatus = state.status;
+  if (nextPsi >= MAX_PSI) status = "lost-shatter";
+  else if (nextPsi <= 0) status = "lost-collapse";
+  else if (nextRefined >= WIN_TARGET) status = "won";
+  state = {
+    ...state,
+    syrup_pressure: clamped,
+    total_juice: state.total_juice + (tally?.total_juice ?? 0),
+    total_crust: state.total_crust + (tally?.total_crust ?? 0),
+    total_pit: state.total_pit + (tally?.total_pit ?? 0),
+    refined: nextRefined,
+    status,
+    updated_at: new Date().toISOString(),
+    harvests: harvest ? [harvest, ...state.harvests].slice(0, 50) : state.harvests,
+  };
+  persist();
+}
+
 export const planetStore = {
   extract(resource_type: ResourceType, amount: number) {
     if (state.status !== "playing") return;
     const delta = DELTA[resource_type] * amount;
-    const nextPsi = state.syrup_pressure + delta;
-    const clamped = Math.max(0, Math.min(MAX_PSI, nextPsi));
-
-    // Refined syrup only credited when juice is tapped inside the safe band.
+    const projected = state.syrup_pressure + delta;
+    const clamped = Math.max(0, Math.min(MAX_PSI, projected));
     const inSafe = clamped >= SAFE_LOW && clamped <= SAFE_HIGH;
     const refinedGain = resource_type === "juice" && inSafe ? amount : 0;
-    const nextRefined = state.refined + refinedGain;
-
-    let status: GameStatus = state.status;
-    if (nextPsi >= MAX_PSI) status = "lost-shatter";
-    else if (nextPsi <= 0) status = "lost-collapse";
-    else if (nextRefined >= WIN_TARGET) status = "won";
-
+    applyPressure(
+      delta,
+      refinedGain,
+      { id: crypto.randomUUID(), resource_type, amount, extracted_at: new Date().toISOString() },
+      {
+        total_juice: resource_type === "juice" ? amount : 0,
+        total_crust: resource_type === "crust" ? amount : 0,
+        total_pit: resource_type === "pit" ? amount : 0,
+      },
+    );
+  },
+  // Surface minigame: seal a fissure on the crust (vents pressure, refines glaze).
+  seal() {
+    applyPressure(-8, 5, undefined, { total_crust: 1 });
+  },
+  // Surface minigame: a fissure burst unsealed — pressure spike.
+  burst() {
+    applyPressure(25, 0);
+  },
+  _legacy_extract_marker() {
     state = {
       ...state,
-      syrup_pressure: clamped,
-      total_juice: state.total_juice + (resource_type === "juice" ? amount : 0),
-      total_crust: state.total_crust + (resource_type === "crust" ? amount : 0),
-      total_pit: state.total_pit + (resource_type === "pit" ? amount : 0),
-      refined: nextRefined,
-      status,
-      updated_at: new Date().toISOString(),
       harvests: [
         { id: crypto.randomUUID(), resource_type, amount, extracted_at: new Date().toISOString() },
         ...state.harvests,
