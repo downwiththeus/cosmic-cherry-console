@@ -30,71 +30,71 @@ const MAX_ACTIVE = 6;
 function SurfaceView() {
   const s = usePlanetStore();
   const [fissures, setFissures] = useState<Fissure[]>([]);
-  const [tick, setTick] = useState(0);
+  const [, setTick] = useState(0);
   const [stats, setStats] = useState({ sealed: 0, burst: 0, combo: 0 });
+  const fissuresRef = useRef<Fissure[]>([]);
   const lastSpawn = useRef(0);
-  const lastTick = useRef(performance.now());
+  const pressureRef = useRef(s.syrup_pressure);
+  pressureRef.current = s.syrup_pressure;
 
-  // Spawn + lifecycle loop
+  // Spawn + lifecycle loop (imperative — no side effects inside setState updaters)
   useEffect(() => {
     if (s.status !== "playing") return;
     let raf = 0;
     const loop = (now: number) => {
-      lastTick.current = now;
-      setTick((t) => (t + 1) % 1_000_000);
+      const stress = Math.abs(pressureRef.current - 500) / 500;
+      const interval = SPAWN_BASE - stress * 1100;
 
-      // Spawn rate scales with pressure stress: faster when near edges.
-      const stress = Math.abs(s.syrup_pressure - 500) / 500; // 0..1
-      const interval = SPAWN_BASE - stress * 1100; // 700–1800ms
-      if (now - lastSpawn.current > interval) {
-        lastSpawn.current = now;
-        setFissures((f) => {
-          if (f.length >= MAX_ACTIVE) return f;
-          return [
-            ...f,
-            {
-              id: crypto.randomUUID(),
-              x: 10 + Math.random() * 80,
-              y: 18 + Math.random() * 64,
-              born: now,
-              life: FISSURE_LIFE - stress * 900,
-              size: 60 + Math.random() * 60,
-            },
-          ];
-        });
+      let changed = false;
+      const alive: Fissure[] = [];
+      let bursts = 0;
+      for (const fi of fissuresRef.current) {
+        if (now - fi.born >= fi.life) bursts++;
+        else alive.push(fi);
+      }
+      if (bursts > 0) {
+        for (let i = 0; i < bursts; i++) planetStore.burst();
+        setStats((st) => ({ ...st, burst: st.burst + bursts, combo: 0 }));
+        changed = true;
       }
 
-      // Burst expired
-      setFissures((f) => {
-        const alive: Fissure[] = [];
-        let bursts = 0;
-        for (const fi of f) {
-          if (now - fi.born >= fi.life) bursts++;
-          else alive.push(fi);
-        }
-        if (bursts) {
-          for (let i = 0; i < bursts; i++) planetStore.burst();
-          setStats((st) => ({ ...st, burst: st.burst + bursts, combo: 0 }));
-        }
-        return alive;
-      });
+      if (now - lastSpawn.current > interval && alive.length < MAX_ACTIVE) {
+        lastSpawn.current = now;
+        alive.push({
+          id: crypto.randomUUID(),
+          x: 10 + Math.random() * 80,
+          y: 18 + Math.random() * 64,
+          born: now,
+          life: FISSURE_LIFE - stress * 900,
+          size: 60 + Math.random() * 60,
+        });
+        changed = true;
+      }
 
+      if (changed) {
+        fissuresRef.current = alive;
+        setFissures(alive);
+      }
+      setTick((t) => (t + 1) % 1_000_000);
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [s.status, s.syrup_pressure]);
+  }, [s.status]);
 
-  // Reset minigame state on game reset
+  // Reset minigame state when game ends/resets
   useEffect(() => {
     if (s.status !== "playing") {
+      fissuresRef.current = [];
       setFissures([]);
       setStats({ sealed: 0, burst: 0, combo: 0 });
     }
   }, [s.status]);
 
   const seal = (id: string) => {
-    setFissures((f) => f.filter((x) => x.id !== id));
+    if (!fissuresRef.current.some((x) => x.id === id)) return;
+    fissuresRef.current = fissuresRef.current.filter((x) => x.id !== id);
+    setFissures(fissuresRef.current);
     planetStore.seal();
     setStats((st) => {
       const combo = st.combo + 1;
@@ -102,6 +102,7 @@ function SurfaceView() {
       return { ...st, sealed: st.sealed + 1, combo };
     });
   };
+
 
   const refined = s.refined ?? 0;
   const pct = Math.min(100, (refined / WIN_TARGET) * 100);
@@ -206,7 +207,7 @@ function SurfaceView() {
       {/* Fissure field — clickable layer */}
       <div className="absolute inset-x-0 bottom-0 z-10" style={{ height: "62%" }}>
         {fissures.map((f) => {
-          const age = (tick && performance.now() - f.born) || 0;
+          const age = performance.now() - f.born;
           const progress = Math.min(1, age / f.life);
           return (
             <button
