@@ -207,7 +207,7 @@ function SurfaceView() {
       {/* Fissure field — clickable layer */}
       <div className="absolute inset-x-0 bottom-0 z-10" style={{ height: "62%" }}>
         {fissures.map((f) => {
-          const age = (tick && performance.now() - f.born) || 0;
+          const age = performance.now() - f.born;
           const progress = Math.min(1, age / f.life);
           return (
             <button
