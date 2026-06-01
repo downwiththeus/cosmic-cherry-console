@@ -3,9 +3,10 @@ import { planetStore } from "@/hooks/use-planet-store";
 import { toast } from "sonner";
 
 const NODES = [
-  { to: "/", label: "Crust", angle: -90 },
-  { to: "/core", label: "Pit", angle: 30 },
-  { to: "/refinery", label: "Filling", angle: 150 },
+  { to: "/", label: "Orbit", angle: -90 },
+  { to: "/surface", label: "Crust", angle: 0 },
+  { to: "/core", label: "Pit", angle: 90 },
+  { to: "/refinery", label: "Filling", angle: 180 },
 ] as const;
 
 export function OrbitNav({ radius = 340 }: { radius?: number }) {
