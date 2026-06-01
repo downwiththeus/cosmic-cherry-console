@@ -115,16 +115,6 @@ export const planetStore = {
   burst() {
     applyPressure(25, 0);
   },
-  _legacy_extract_marker() {
-    state = {
-      ...state,
-      harvests: [
-        { id: crypto.randomUUID(), resource_type, amount, extracted_at: new Date().toISOString() },
-        ...state.harvests,
-      ].slice(0, 50),
-    };
-    persist();
-  },
   reset() {
     state = initial();
     persist();
